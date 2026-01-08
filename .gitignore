@@ -3,6 +3,7 @@ venv/
 .venv/
 documents/
 output/
+
 # 环境变量（含敏感信息）
 .env
 
@@ -30,3 +31,6 @@ temp/
 *.pdf
 *.docx
 data/
+
+# Qdrant本地数据（可选，如果不想提交索引数据）
+qdrant_data/
