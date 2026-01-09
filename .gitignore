@@ -31,6 +31,7 @@ temp/
 *.pdf
 *.docx
 data/
+cache/
 
 # Qdrant本地数据（可选，如果不想提交索引数据）
 qdrant_data/
