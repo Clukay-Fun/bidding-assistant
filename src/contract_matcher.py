@@ -3,60 +3,28 @@
 功能：根据招标要求，从数据库中筛选匹配的业绩合同
 """
 
-from dotenv import load_dotenv
-from openai import OpenAI
 from datetime import datetime, timedelta
+from openai import OpenAI
 import json
-import os
+import sys
+from pathlib import Path
 
-from database import get_session, Contract
+# 添加项目路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# 加载环境变量
-load_dotenv()
-
-# ============================================
-# region 配置
-# ============================================
-
-SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY")
-SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
-REASONING_MODEL = "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
-
-# endregion
-# ============================================
+from config.settings import (
+    SILICONFLOW_API_KEY,
+    SILICONFLOW_BASE_URL,
+    REASONING_MODEL,
+    expand_keywords
+)
+from src.database import get_session, Contract
+from src.utils import load_prompt, clean_json_response
 
 
 # ============================================
 # region 需求解析
 # ============================================
-
-PARSE_REQUIREMENT_PROMPT = """你是一个招投标专家。请分析以下业绩要求，提取筛选条件。
-
-## 业绩要求原文
-{requirement}
-
-## 请提取以下筛选条件（JSON格式）
-
-1. **time_range**: 时间范围（年数，如"近五年"填5，"近三年"填3）
-2. **min_count**: 最少业绩数量（如"至少1项"填1）
-3. **industry**: 行业要求（如"能源类"、"医疗"、"金融"等，无要求填null）
-4. **project_type**: 项目类型要求（"常法"/"诉讼"/"专项"，无要求填null）
-5. **min_amount**: 最低合同金额（万元，无要求填null）
-6. **state_owned_required**: 是否要求国企业绩（true/false）
-7. **keywords**: 其他关键词列表（用于模糊匹配）
-
-## 输出JSON（不要```标记）
-{{
-  "time_range": 5,
-  "min_count": 1,
-  "industry": "能源",
-  "project_type": null,
-  "min_amount": null,
-  "state_owned_required": false,
-  "keywords": ["燃气", "光伏", "电力", "储能"]
-}}
-"""
-
 
 def parse_requirement(requirement_text: str) -> dict:
     """解析业绩要求，提取筛选条件"""
@@ -68,37 +36,23 @@ def parse_requirement(requirement_text: str) -> dict:
     )
     
     try:
+        prompt_template = load_prompt("requirement_parse")
+        prompt = prompt_template.replace("{requirement}", requirement_text)
+        
         response = client.chat.completions.create(
             model=REASONING_MODEL,
             messages=[
-                {
-                    "role": "system",
-                    "content": "你是招投标专家，请严格按JSON格式输出筛选条件。"
-                },
-                {
-                    "role": "user",
-                    "content": PARSE_REQUIREMENT_PROMPT.format(requirement=requirement_text)
-                }
+                {"role": "system", "content": "你是招投标专家，请严格按JSON格式输出筛选条件。"},
+                {"role": "user", "content": prompt}
             ],
             temperature=0.1,
             max_tokens=1000
         )
         
         result_text = response.choices[0].message.content.strip()
+        result_text = clean_json_response(result_text)
         
-        # 清理JSON
-        if "```" in result_text:
-            result_text = result_text.split("```")[1]
-            if result_text.startswith("json"):
-                result_text = result_text[4:]
-            result_text = result_text.split("```")[0]
-        
-        if "{" in result_text:
-            start = result_text.find("{")
-            end = result_text.rfind("}") + 1
-            result_text = result_text[start:end]
-        
-        conditions = json.loads(result_text.strip())
+        conditions = json.loads(result_text)
         print(f"   ✅ 解析完成: {conditions}")
         return conditions
         
@@ -109,36 +63,6 @@ def parse_requirement(requirement_text: str) -> dict:
 # endregion
 # ============================================
 
-# ============================================
-# region 同义词扩展
-# ============================================
-
-# 行业同义词映射
-INDUSTRY_SYNONYMS = {
-    "能源": ["能源", "燃气", "天然气", "光伏", "电力", "储能", "分布式能源", "新能源", "清洁能源", "石油", "煤炭"],
-    "燃气": ["燃气", "天然气", "液化气", "煤气"],
-    "光伏": ["光伏", "太阳能", "新能源"],
-    "电力": ["电力", "供电", "发电", "输电", "配电"],
-    "金融": ["金融", "银行", "证券", "保险", "基金", "投资"],
-    "医疗": ["医疗", "医院", "医药", "卫生", "健康"],
-    "房地产": ["房地产", "地产", "房产", "置业", "物业"],
-}
-
-
-def expand_keywords(keywords: list) -> list:
-    """扩展关键词（添加同义词）"""
-    expanded = set(keywords) if keywords else set()
-    
-    for kw in keywords or []:
-        # 查找同义词
-        for category, synonyms in INDUSTRY_SYNONYMS.items():
-            if kw in synonyms or kw == category:
-                expanded.update(synonyms)
-    
-    return list(expanded)
-
-# endregion
-# ============================================
 
 # ============================================
 # region 数据库筛选
@@ -180,20 +104,17 @@ def search_contracts_by_conditions(conditions: dict) -> list:
         if conditions.get("industry") or conditions.get("keywords"):
             filtered = []
             
-            # 扩展关键词（添加同义词）
+            # 扩展关键词
             original_keywords = conditions.get("keywords", [])
             industry = conditions.get("industry", "")
             
-            # 把行业也加入关键词
             if industry:
                 original_keywords = [industry] + (original_keywords or [])
             
-            # 扩展同义词
             expanded_keywords = expand_keywords(original_keywords)
             print(f"   🔍 扩展关键词: {expanded_keywords}")
             
             for c in contracts:
-                # 构建搜索文本
                 text_to_search = " ".join([
                     c.party_a or '',
                     c.party_a_industry or '',
@@ -202,7 +123,6 @@ def search_contracts_by_conditions(conditions: dict) -> list:
                     c.summary or ''
                 ]).lower()
                 
-                # 检查是否匹配任一关键词
                 matched = False
                 matched_keywords = []
                 
@@ -218,7 +138,6 @@ def search_contracts_by_conditions(conditions: dict) -> list:
             contracts = filtered
             print(f"   📊 关键词筛选后: {len(contracts)} 条")
         
-        # 转换为字典列表（返回所有符合条件的，不限数量）
         results = [c.to_dict() for c in contracts]
         return results
         
@@ -233,39 +152,6 @@ def search_contracts_by_conditions(conditions: dict) -> list:
 # region AI评估匹配度
 # ============================================
 
-EVALUATE_PROMPT = """你是招投标专家。请评估以下业绩是否符合招标要求。
-
-## 招标业绩要求
-{requirement}
-
-## 候选业绩
-{contracts}
-
-## 请对每条业绩进行评估
-
-输出JSON格式（不要```标记）：
-{{
-  "matches": [
-    {{
-      "id": 1,
-      "contract_name": "合同名称",
-      "party_a": "甲方",
-      "match_score": 95,
-      "match_reason": "符合能源类企业要求，时间在近五年内",
-      "risk_points": "无"
-    }}
-  ],
-  "summary": "共找到X条符合要求的业绩，建议选用..."
-}}
-
-## 评分标准
-- 90-100: 完全符合
-- 70-89: 基本符合
-- 50-69: 部分符合
-- 0-49: 不符合
-"""
-
-
 def evaluate_matches(requirement: str, contracts: list) -> dict:
     """AI评估业绩匹配度"""
     print("🤖 AI评估匹配度...")
@@ -273,7 +159,7 @@ def evaluate_matches(requirement: str, contracts: list) -> dict:
     if not contracts:
         return {"matches": [], "summary": "未找到符合条件的业绩"}
     
-    # 准备合同摘要（不限制数量）
+    # 准备合同摘要
     contracts_text = ""
     for i, c in enumerate(contracts, 1):
         contracts_text += f"""
@@ -295,38 +181,26 @@ def evaluate_matches(requirement: str, contracts: list) -> dict:
     )
     
     try:
+        prompt_template = load_prompt("match_evaluate")
+        prompt = prompt_template.replace("{requirement}", requirement).replace("{contracts}", contracts_text)
+        
         response = client.chat.completions.create(
             model=REASONING_MODEL,
             messages=[
-                {
-                    "role": "system",
-                    "content": "你是招投标专家，请对所有业绩进行评估，给出匹配度评分。"
-                },
-                {
-                    "role": "user",
-                    "content": EVALUATE_PROMPT.format(
-                        requirement=requirement,
-                        contracts=contracts_text
-                    )
-                }
+                {"role": "system", "content": "你是招投标专家，请严格评估业绩是否符合要求。"},
+                {"role": "user", "content": prompt}
             ],
             temperature=0.1,
-            max_tokens=4000  # 增加token限制
+            max_tokens=4000
         )
         
         result_text = response.choices[0].message.content.strip()
+        result_text = clean_json_response(result_text)
         
-        # 清理JSON
-        if "{" in result_text:
-            start = result_text.find("{")
-            end = result_text.rfind("}") + 1
-            result_text = result_text[start:end]
-        
-        return json.loads(result_text.strip())
+        return json.loads(result_text)
         
     except Exception as e:
         print(f"   ❌ 评估失败: {e}")
-        # 返回基础结果（不经过AI评估）
         return {
             "matches": [
                 {
@@ -353,12 +227,6 @@ def evaluate_matches(requirement: str, contracts: list) -> dict:
 def match_contracts(requirement: str) -> dict:
     """
     业绩智能匹配主函数
-    
-    参数:
-        requirement: 招标文件中的业绩要求文本
-    
-    返回:
-        匹配结果
     """
     print("\n" + "="*50)
     print("🎯 业绩智能匹配")
@@ -431,13 +299,8 @@ def interactive_match():
 
 
 if __name__ == "__main__":
-    # 方式1: 交互式匹配
-    # interactive_match()
-    
-    # 方式2: 直接测试
-    test_requirement = """
-    近五年内（从采购公告发布之日起倒推）响应人至少拥有1项能源类企业
-    （燃气、光伏、分布式能源、电力、储能等行业）法律服务的业绩。
-    """
-    
-    match_contracts(test_requirement)
+    if len(sys.argv) > 1:
+        requirement = " ".join(sys.argv[1:])
+        match_contracts(requirement)
+    else:
+        interactive_match()

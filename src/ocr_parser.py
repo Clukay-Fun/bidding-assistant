@@ -7,17 +7,13 @@ from pathlib import Path
 from pdf2image import convert_from_path
 from paddleocr import PaddleOCR
 import time
+import sys
 
-# ============================================
-# region 配置区域
-# ============================================
+# 添加项目路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-POPPLER_PATH = r"D:\.Software\poppler\Library\bin"
-OUTPUT_DIR = Path("./output")
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-# endregion
-# ============================================
+from config.settings import POPPLER_PATH, OUTPUT_DIR, OCR_DPI, OCR_LANG
+from src.text_cleaner import filter_watermarks
 
 
 # ============================================
@@ -30,7 +26,7 @@ def pdf_to_images(pdf_path: str) -> list:
     images = convert_from_path(
         pdf_path,
         poppler_path=POPPLER_PATH,
-        dpi=200
+        dpi=OCR_DPI
     )
     print(f"✅ 共转换 {len(images)} 页")
     return images
@@ -49,7 +45,7 @@ def ocr_images(images: list) -> list:
     
     print("🔧 正在初始化PaddleOCR...")
     ocr = PaddleOCR(
-        lang='ch',
+        lang=OCR_LANG,
         use_doc_orientation_classify=False,
         use_doc_unwarping=False,
         use_textline_orientation=False,
@@ -163,7 +159,6 @@ def pdf_to_markdown(pdf_path: str, output_path: str = None, filter_watermark: bo
     
     # 3. 过滤水印（可选）
     if filter_watermark:
-        from text_cleaner import filter_watermarks
         print("\n🔍 开始过滤水印")
         results = filter_watermarks(results)
     
@@ -189,5 +184,8 @@ def pdf_to_markdown(pdf_path: str, output_path: str = None, filter_watermark: bo
 
 
 if __name__ == "__main__":
-    test_file = "街道服务业绩20260106.pdf"
-    pdf_to_markdown(test_file)
+    import sys
+    if len(sys.argv) > 1:
+        pdf_to_markdown(sys.argv[1])
+    else:
+        print("用法: python -m src.ocr_parser <PDF文件路径>")

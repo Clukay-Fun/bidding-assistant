@@ -1,22 +1,23 @@
 """
 Word文档转Markdown
-功能：使用 MarkItDown 将Word文档（含表格）转换为Markdown格式
+功能：使用 MarkItDown 将Word文档转换为Markdown格式
 """
 
 from pathlib import Path
 from markitdown import MarkItDown
 import time
+import sys
+
+# 添加项目路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from config.settings import OUTPUT_DIR
+
 
 # ============================================
-# region 配置区域
-# 输出目录
-OUTPUT_DIR = Path("./output")
-OUTPUT_DIR.mkdir(exist_ok=True)
-# endregion
+# region Word转Markdown
 # ============================================
 
-# ============================================
-# region Word转Markdown主函数
 def docx_to_markdown(docx_path: str, output_path: str = None) -> str:
     """
     将Word文档转换为Markdown
@@ -51,9 +52,13 @@ def docx_to_markdown(docx_path: str, output_path: str = None) -> str:
     print(f"⏱️ 耗时: {elapsed:.2f} 秒")
 
     return str(output_path)
+
 # endregion
 # ============================================
 
+
 if __name__ == "__main__":
-    test_file = "template/采购文件.docx"
-    docx_to_markdown(test_file)
+    if len(sys.argv) > 1:
+        docx_to_markdown(sys.argv[1])
+    else:
+        print("用法: python -m src.docx_to_markdown <Word文件路径>")

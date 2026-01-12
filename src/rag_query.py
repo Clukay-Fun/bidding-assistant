@@ -4,54 +4,38 @@ RAG问答系统
 """
 
 from pathlib import Path
-from dotenv import load_dotenv
 from openai import OpenAI as OpenAIClient
-import os
+import httpx
 import time
+import sys
+
+# 添加项目路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from llama_index.core import Settings, VectorStoreIndex
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
 from qdrant_client import QdrantClient
 
-# 加载环境变量
-load_dotenv()
-
-# ============================================
-# region 配置区域
-# ============================================
-
-# 硅基流动API配置
-SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY")
-SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
-
-# 模型配置
-EMBEDDING_MODEL = "BAAI/bge-m3"
-LLM_MODEL = "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
-RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
-
-# Qdrant配置
-QDRANT_PATH = "./qdrant_data"
-COLLECTION_NAME = "bidding_docs"
-
-# endregion
-# ============================================
+from config.settings import (
+    SILICONFLOW_API_KEY,
+    SILICONFLOW_BASE_URL,
+    EMBEDDING_MODEL,
+    EMBEDDING_BATCH_SIZE,
+    REASONING_MODEL,
+    RERANK_MODEL,
+    QDRANT_PATH,
+    QDRANT_COLLECTION_NAME
+)
+from src.utils import load_prompt
 
 
 # ============================================
-# region 客户端初始化
+# region 初始化
 # ============================================
 
 def get_llm_client() -> OpenAIClient:
     """获取LLM客户端"""
-    return OpenAIClient(
-        api_key=SILICONFLOW_API_KEY,
-        base_url=SILICONFLOW_BASE_URL
-    )
-
-
-def get_rerank_client() -> OpenAIClient:
-    """获取Rerank客户端（硅基流动）"""
     return OpenAIClient(
         api_key=SILICONFLOW_API_KEY,
         base_url=SILICONFLOW_BASE_URL
@@ -64,7 +48,7 @@ def init_embedding():
         api_key=SILICONFLOW_API_KEY,
         api_base=SILICONFLOW_BASE_URL,
         model_name=EMBEDDING_MODEL,
-        embed_batch_size=32,
+        embed_batch_size=EMBEDDING_BATCH_SIZE,
     )
     Settings.embed_model = embed_model
     print(f"✅ Embedding: {EMBEDDING_MODEL}")
@@ -72,12 +56,12 @@ def init_embedding():
 
 def load_index() -> VectorStoreIndex:
     """加载已有的向量索引"""
-    print(f"📂 加载索引: {COLLECTION_NAME}")
+    print(f"📂 加载索引: {QDRANT_COLLECTION_NAME}")
     
     client = QdrantClient(path=QDRANT_PATH)
     vector_store = QdrantVectorStore(
         client=client,
-        collection_name=COLLECTION_NAME,
+        collection_name=QDRANT_COLLECTION_NAME,
     )
     
     index = VectorStoreIndex.from_vector_store(vector_store)
@@ -95,25 +79,13 @@ def load_index() -> VectorStoreIndex:
 def rerank_nodes(query: str, nodes: list, top_n: int = 3) -> list:
     """
     使用硅基流动的Rerank API对结果重排序
-    
-    参数:
-        query: 查询文本
-        nodes: 检索到的节点列表
-        top_n: 保留前N个结果
-    
-    返回:
-        重排序后的节点列表
     """
     if not nodes:
         return nodes
     
     try:
-        import httpx
-        
-        # 准备文档列表
         documents = [node.text for node in nodes]
         
-        # 调用Rerank API
         response = httpx.post(
             f"{SILICONFLOW_BASE_URL}/rerank",
             headers={
@@ -132,12 +104,10 @@ def rerank_nodes(query: str, nodes: list, top_n: int = 3) -> list:
         if response.status_code == 200:
             result = response.json()
             
-            # 按照重排序结果重新排列nodes
             reranked_nodes = []
             for item in result.get("results", []):
                 idx = item["index"]
                 if idx < len(nodes):
-                    # 更新分数
                     nodes[idx].score = item["relevance_score"]
                     reranked_nodes.append(nodes[idx])
             
@@ -159,30 +129,12 @@ def rerank_nodes(query: str, nodes: list, top_n: int = 3) -> list:
 # region LLM调用
 # ============================================
 
-QA_PROMPT_TEMPLATE = """你是一个专业的招投标文档分析助手。请根据以下检索到的文档内容，回答用户的问题。
-
-## 要求
-1. 只根据提供的文档内容回答，不要编造信息
-2. 如果文档中没有相关信息，请明确告知
-3. 回答要准确、简洁、专业
-4. 在回答末尾标注信息来源（使用文档路径）
-
-## 检索到的文档内容
-{context}
-
-## 用户问题
-{question}
-
-## 回答
-"""
-
-
 def call_llm(prompt: str) -> str:
     """调用LLM生成回答"""
     client = get_llm_client()
     
     response = client.chat.completions.create(
-        model=LLM_MODEL,
+        model=REASONING_MODEL,
         messages=[
             {"role": "system", "content": "你是一个专业的招投标文档分析助手。"},
             {"role": "user", "content": prompt}
@@ -241,8 +193,9 @@ def query_with_sources(
     
     context = "\n".join(context_parts)
     
-    # 4. 调用LLM生成答案
-    prompt = QA_PROMPT_TEMPLATE.format(context=context, question=question)
+    # 4. 加载提示词并调用LLM
+    prompt_template = load_prompt("rag_qa")
+    prompt = prompt_template.replace("{context}", context).replace("{question}", question)
     answer = call_llm(prompt)
     
     elapsed = time.time() - start_time
@@ -316,7 +269,7 @@ def main():
     
     # 初始化
     init_embedding()
-    print(f"✅ LLM: {LLM_MODEL}")
+    print(f"✅ LLM: {REASONING_MODEL}")
     print(f"✅ Rerank: {RERANK_MODEL}")
     
     # 加载索引
@@ -328,6 +281,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# endregion
-# ============================================

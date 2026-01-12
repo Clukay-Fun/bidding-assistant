@@ -7,26 +7,13 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, Da
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
-from dotenv import load_dotenv
-import os
+from pathlib import Path
+import sys
 
-# 加载环境变量
-load_dotenv()
+# 添加项目路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# ============================================
-# region 数据库配置
-# ============================================
-
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME", "bidding_assistant")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
-# endregion
-# ============================================
+from config.settings import DATABASE_URL
 
 
 # ============================================
@@ -36,6 +23,7 @@ DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NA
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
 
 def get_session():
     """获取数据库会话"""
@@ -65,7 +53,6 @@ class Contract(Base):
     is_individual = Column(Boolean, default=False, comment="是否是个人")
     
     # 合同信息
-    contract_number = Column(Integer, comment="合同号")
     amount = Column(Float, comment="合同金额（万元）")
     fee_method = Column(String(100), comment="收费方式")
     sign_date = Column(String(20), comment="签订日期")
@@ -103,7 +90,6 @@ class Contract(Base):
             "party_a_industry": self.party_a_industry,
             "is_state_owned": self.is_state_owned,
             "is_individual": self.is_individual,
-            "contract_number": self.contract_number,
             "amount": self.amount,
             "fee_method": self.fee_method,
             "sign_date": self.sign_date,

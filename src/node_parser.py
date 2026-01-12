@@ -5,31 +5,20 @@ AI驱动的文档结构解析器
 
 from pathlib import Path
 from openai import OpenAI
-from dotenv import load_dotenv
 import json
-import os
 import time
+import sys
 
-# 加载环境变量
-load_dotenv()
+# 添加项目路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# ============================================
-# region 配置区域
-# ============================================
-
-# 硅基流动API配置
-SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY")
-SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
-
-# 模型选择
-STRUCTURE_MODEL = "Qwen/Qwen3-8B"
-
-# 输出目录
-OUTPUT_DIR = Path("./output")
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-# endregion
-# ============================================
+from config.settings import (
+    SILICONFLOW_API_KEY, 
+    SILICONFLOW_BASE_URL, 
+    EXTRACT_MODEL,
+    OUTPUT_DIR
+)
+from src.utils import load_prompt, clean_json_response
 
 
 # ============================================
@@ -50,68 +39,6 @@ def get_client() -> OpenAI:
 # ============================================
 # region 结构化解析
 # ============================================
-
-STRUCTURE_PROMPT = """你是一个专业的文档结构分析专家，专门处理招投标文档。
-
-请分析以下文档内容，将其解析为层级结构。
-
-## 解析规则
-
-1. **识别标题层级**：
-   - 层级1：章标题（如"第一章"、"第二章"）
-   - 层级2：节标题（如"一、"、"二、"）
-   - 层级3：条款标题（如"（一）"、"（二）"）
-   - 层级4：子条款（如"1."、"2."或更深层编号）
-
-2. **每个节点包含**：
-   - title: 标题文本
-   - level: 层级数字(1-4)
-   - content: **仅该标题下的直接正文内容，不包含任何子标题及其内容**
-   - children: 子节点数组
-
-3. **重要：避免内容重复**：
-   - 如果标题下紧接着就是子标题，则content为空字符串""
-   - 子标题及其内容只能出现在children中，不能重复出现在父节点的content中
-
-4. **极其重要：保证内容完整**：
-   - **必须保留原文的每一句话、每一个段落，绝对不能省略任何内容**
-   - **所有编号项（1）2）3）4）等）必须全部保留，不能遗漏**
-   - **如果内容很长，也必须完整输出，不要截断或总结**
-   - 表格内容必须完整保留
-   - 宁可输出更长的JSON，也不能丢失任何原文内容
-
-5. **注意事项**：
-   - 表格内容归属于其上方最近的标题
-   - 没有标题的开头内容归属于文档根节点
-
-## 输出格式
-
-请直接输出JSON，不要包含```json```标记：
-{
-  "title": "文档标题",
-  "level": 0,
-  "content": "文档开头的非标题内容（如果紧接子标题则为空）",
-  "children": [
-    {
-      "title": "第一章 XXX",
-      "level": 1,
-      "content": "",
-      "children": [
-        {
-          "title": "一、XXX",
-          "level": 2,
-          "content": "该节的完整正文内容，必须包含所有段落和编号项...",
-          "children": []
-        }
-      ]
-    }
-  ]
-}
-
-## 待解析文档
-
-"""
-
 
 def parse_document_structure(markdown_content: str, chunk_size: int = 15000) -> dict:
     """
@@ -161,8 +88,12 @@ def parse_document_structure(markdown_content: str, chunk_size: int = 15000) -> 
 def _parse_chunk(client: OpenAI, content: str) -> dict:
     """解析单个文档块"""
     try:
+        # 加载提示词
+        prompt_template = load_prompt("structure_parse")
+        prompt = prompt_template.replace("{document_content}", content)
+        
         response = client.chat.completions.create(
-            model=STRUCTURE_MODEL,
+            model=EXTRACT_MODEL,
             messages=[
                 {
                     "role": "system",
@@ -170,28 +101,20 @@ def _parse_chunk(client: OpenAI, content: str) -> dict:
                 },
                 {
                     "role": "user", 
-                    "content": STRUCTURE_PROMPT + content
+                    "content": prompt
                 }
             ],
-            temperature=0.1,  # 低温度保证输出稳定
+            temperature=0.1,
             max_tokens=16000
         )
         
         result_text = response.choices[0].message.content.strip()
+        result_text = clean_json_response(result_text)
         
-        # 清理可能的markdown标记
-        if result_text.startswith("```"):
-            result_text = result_text.split("```")[1]
-            if result_text.startswith("json"):
-                result_text = result_text[4:]
-        if result_text.endswith("```"):
-            result_text = result_text[:-3]
-        
-        return json.loads(result_text.strip())
+        return json.loads(result_text)
         
     except json.JSONDecodeError as e:
         print(f"   ⚠️ JSON解析失败: {e}")
-        print(f"   原始输出: {result_text[:500]}...")
         return None
     except Exception as e:
         print(f"   ❌ API调用失败: {e}")
@@ -221,7 +144,7 @@ def _split_by_chapters(content: str) -> list:
 
 
 # ============================================
-# region 转换为LlamaIndex Node
+# region 转换为Node列表
 # ============================================
 
 def structure_to_nodes(structure: dict, parent_id: str = None) -> list:
@@ -331,14 +254,12 @@ def parse_markdown_to_nodes(markdown_path: str) -> list:
 
 
 if __name__ == "__main__":
-    # 测试
-    test_file = "output/采购文件.md"
-    nodes = parse_markdown_to_nodes(test_file)
-    
-    # 打印前5个Node预览
-    print("\n📋 Node预览（前5个）:")
-    for node in nodes[:5]:
-        print(f"\n[{node['id']}] {node['metadata']['title']}")
-        print(f"    层级: {node['metadata']['level']}")
-        print(f"    路径: {node['metadata']['path']}")
-        print(f"    内容: {node['text'][:100]}..." if node['text'] else "    内容: (空)")
+    if len(sys.argv) > 1:
+        parse_markdown_to_nodes(sys.argv[1])
+    else:
+        # 默认测试
+        test_file = OUTPUT_DIR / "采购文件.md"
+        if test_file.exists():
+            parse_markdown_to_nodes(str(test_file))
+        else:
+            print("用法: python -m src.node_parser <Markdown文件路径>")
