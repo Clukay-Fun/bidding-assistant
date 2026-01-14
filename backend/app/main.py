@@ -78,11 +78,25 @@ app.add_middleware(
 from app.api.health import router as health_router
 app.include_router(health_router, tags=["健康检查"])
 
-# TODO: 后续添加更多路由
-# from app.api.performance import router as performance_router
-# from app.api.chat import router as chat_router
-# app.include_router(performance_router, prefix="/api/v1", tags=["业绩管理"])
-# app.include_router(chat_router, prefix="/api/v1", tags=["对话"])
+# 对话路由
+from app.api.chat import router as chat_router
+app.include_router(chat_router, prefix="/api/v1", tags=["对话"])
+
+# 业绩管理路由
+from app.api.performance import router as performance_router
+app.include_router(performance_router, prefix="/api/v1", tags=["业绩管理"])
+
+# 企业管理路由
+from app.api.enterprise import router as enterprise_router
+app.include_router(enterprise_router, prefix="/api/v1", tags=["企业管理"])
+
+# 律师管理路由
+from app.api.lawyer import router as lawyer_router
+app.include_router(lawyer_router, prefix="/api/v1", tags=["律师管理"])
+
+# 文件上传路由
+from app.api.upload import router as upload_router
+app.include_router(upload_router, prefix="/api/v1", tags=["文件上传"])
 
 # endregion
 # ============================================
