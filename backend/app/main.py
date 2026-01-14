@@ -94,6 +94,10 @@ app.include_router(enterprise_router, prefix="/api/v1", tags=["企业管理"])
 from app.api.lawyer import router as lawyer_router
 app.include_router(lawyer_router, prefix="/api/v1", tags=["律师管理"])
 
+# 文件上传路由
+from app.api.upload import router as upload_router
+app.include_router(upload_router, prefix="/api/v1", tags=["文件上传"])
+
 # endregion
 # ============================================
 
