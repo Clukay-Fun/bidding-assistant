@@ -17,6 +17,16 @@ from app.services.extractor import (
     images_to_blob,
 )
 
+from app.services.vector_search import (
+    get_embedding,
+    get_embeddings_batch,
+    search_performances_by_vector,
+    hybrid_search_performances,
+    search_lawyers_by_resume,
+    update_performance_embedding,
+    batch_update_embeddings,
+)
+
 __all__ = [
     # OCR
     "pdf_to_images",
@@ -29,4 +39,12 @@ __all__ = [
     "extract_with_vision",
     "extract_with_text",
     "images_to_blob",
+    # 向量搜索
+    "get_embedding",
+    "get_embeddings_batch",
+    "search_performances_by_vector",
+    "hybrid_search_performances",
+    "search_lawyers_by_resume",
+    "update_performance_embedding",
+    "batch_update_embeddings",
 ]

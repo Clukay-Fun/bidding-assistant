@@ -22,6 +22,24 @@ engine = create_engine(
 # endregion
 # ============================================
 
+# ============================================
+# region 启用 pgvector 扩展
+# ============================================
+def init_pgvector():
+    """
+    启用 pgvector 扩展
+    
+    原理:
+        pgvector 是 PostgreSQL 的向量存储扩展，
+        必须先执行 CREATE EXTENSION 才能使用 Vector 类型
+    """
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.commit()
+        print("✅ pgvector 扩展已启用")
+# endregion
+# ============================================
 
 # ============================================
 # region 会话工厂
