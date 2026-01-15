@@ -33,6 +33,20 @@ class AgentState(str, Enum):
 # endregion
 # ============================================
 
+# ============================================
+# region StateType（简化版状态）
+# ============================================
+
+class StateType(str, Enum):
+    """Agent 状态类型（简化版）"""
+    IDLE = "idle"
+    THINKING = "thinking"
+    ACTING = "acting"
+    FINISHED = "finished"
+    ERROR = "error"
+
+# endregion
+# ============================================
 
 # ============================================
 # region 执行步骤记录
@@ -154,6 +168,30 @@ class AgentContext(BaseModel):
             lines.append(f"✅ 最终答案: {self.final_answer}")
         
         return "\n".join(lines)
+
+# endregion
+# ============================================
+
+# ============================================
+# region AgentState 简化实现
+# ============================================
+
+class AgentStateManager:
+    """Agent 状态管理器"""
+    
+    def __init__(self):
+        self.current = StateType.IDLE
+        self.history = []
+    
+    def reset(self):
+        """重置状态"""
+        self.current = StateType.IDLE
+        self.history = []
+    
+    def transition(self, new_state: StateType):
+        """状态转换"""
+        self.history.append(self.current)
+        self.current = new_state
 
 # endregion
 # ============================================

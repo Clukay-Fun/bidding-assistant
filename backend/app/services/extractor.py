@@ -9,11 +9,12 @@ import io
 from typing import List, Optional
 from PIL import Image
 from openai import OpenAI
-
+# 视觉模型从配置导入
 from app.config import (
     SILICONFLOW_API_KEY,
     SILICONFLOW_BASE_URL,
     EXTRACT_MODEL,
+    VISION_MODEL
 )
 
 

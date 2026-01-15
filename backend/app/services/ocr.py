@@ -3,6 +3,7 @@ OCR 识别服务
 整合自 src/ocr_parser.py，提供 PDF 转文本功能
 """
 
+import os
 import io
 from pathlib import Path
 from typing import List, Optional
@@ -14,9 +15,11 @@ from app.config import BACKEND_DIR
 # ============================================
 # region 配置
 # ============================================
+# 禁用模型连接检查，加速启动
+os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
+os.environ["PADDLEOCR_HOME"] = os.path.expanduser("~/.paddleocr")
 
 # Poppler 路径（从环境变量或默认路径）
-import os
 POPPLER_PATH = os.getenv("POPPLER_PATH", r"D:\.Software\poppler\Library\bin")
 
 # OCR 配置
