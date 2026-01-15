@@ -23,6 +23,10 @@ async def lifespan(app: FastAPI):
     """
     # 启动时执行
     print("🚀 正在启动应用...")
+
+    # 启用 pgvector 扩展（必须在创建表之前）
+    from app.db.database import init_pgvector
+    init_pgvector()
     
     # 创建数据库表（如果不存在）
     # 注意：生产环境建议使用 Alembic 迁移
@@ -97,6 +101,10 @@ app.include_router(lawyer_router, prefix="/api/v1", tags=["律师管理"])
 # 文件上传路由
 from app.api.upload import router as upload_router
 app.include_router(upload_router, prefix="/api/v1", tags=["文件上传"])
+
+# 语义搜索路由
+from app.api.search import router as search_router
+app.include_router(search_router, prefix="/api/v1", tags=["语义搜索"])
 
 # endregion
 # ============================================

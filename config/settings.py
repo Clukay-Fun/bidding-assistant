@@ -151,3 +151,19 @@ def expand_keywords(keywords: list) -> list:
                 expanded.update(synonyms)
     
     return list(expanded)
+
+# ============================================
+# region 向量配置 (pgvector)
+# ============================================
+
+# 向量维度（bge-m3 输出维度为 1024）
+VECTOR_DIMENSION = 1024
+
+# 相似度搜索 Top-K
+VECTOR_TOP_K = 10
+
+# 相似度阈值（余弦距离小于此值才返回）
+VECTOR_SIMILARITY_THRESHOLD = 0.8
+
+# endregion
+# ============================================
