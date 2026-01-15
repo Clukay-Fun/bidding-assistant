@@ -40,10 +40,10 @@ OCR识别文本（供参考）：
     "party_a_industry": "甲方所属行业",
     "is_state_owned": true或false（甲方是否为国企）,
     "contract_type": "合同类型（委托代理合同/常年法律顾问合同/专项法律服务/其他）",
-    "amount": 合同金额（数字，单位：元，不是万元）,
+    "amount": 合同金额（数字，单位：万元，请转换为万元后填写），
     "sign_date": "签订日期（YYYY-MM-DD格式）",
     "project_detail": "项目详情/服务内容摘要",
-    "subject_amount": 标的额（诉讼案件，数字，单位：元）,
+    "subject_amount": 标的额（诉讼案件，数字，单位：万元），
     "opponent": "对方当事人（诉讼案件）",
     "team_member": "团队成员/承办律师",
     "summary": "合同摘要（一句话描述）"
@@ -51,7 +51,7 @@ OCR识别文本（供参考）：
 ```
 
 注意：
-1. 金额请转换为元（不是万元）
+1. 金额统一转换为【万元】单位（例如：60000元 = 6万元，填写6）
 2. 日期请转换为 YYYY-MM-DD 格式
 3. 只输出JSON，不要其他内容
 """
@@ -72,17 +72,20 @@ TEXT_EXTRACT_PROMPT = """
     "party_a_industry": "甲方所属行业",
     "is_state_owned": true或false（甲方是否为国企）,
     "contract_type": "合同类型（委托代理合同/常年法律顾问合同/专项法律服务/其他）",
-    "amount": 合同金额（数字，单位：元）,
+    "amount": 合同金额（数字，单位：万元，请转换为万元后填写）,
     "sign_date": "签订日期（YYYY-MM-DD格式）",
     "project_detail": "项目详情/服务内容摘要",
-    "subject_amount": 标的额（诉讼案件，数字，单位：元）,
+    "subject_amount": 标的额（诉讼案件，数字，单位：万元）,
     "opponent": "对方当事人（诉讼案件）",
     "team_member": "团队成员/承办律师",
     "summary": "合同摘要（一句话描述）"
 }
 ```
 
-只输出JSON，不要其他内容。
+注意：
+1. 金额统一转换为【万元】单位（例如：60000元 = 6万元，填写6）
+2. 日期请转换为 YYYY-MM-DD 格式
+3. 只输出JSON，不要其他内容
 """
 
 # endregion

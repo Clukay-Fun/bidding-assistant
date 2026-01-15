@@ -128,13 +128,15 @@ async def upload_and_ocr(
 @router.post("/contract", response_model=UploadResponse)
 async def upload_and_extract_contract(
     file: UploadFile = File(..., description="合同 PDF 文件"),
-    use_vision: bool = Form(True, description="是否使用视觉模型"),
+    use_vision: bool = Form(False, description="是否使用视觉模型（默认关闭，使用纯文本提取更快）"),
     save_to_db: bool = Form(True, description="是否保存到数据库"),
     db: Session = Depends(get_db),
 ):
     """
     上传合同 PDF，进行 OCR 识别并提取关键信息
     """
+    print(f"[上传] 开始处理文件: {file.filename}")
+    
     # 验证文件类型
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="只支持 PDF 文件")
@@ -144,19 +146,28 @@ async def upload_and_extract_contract(
     # 检查文件是否已存在
     existing = crud.get_performance_by_filename(db, file_name)
     if existing:
-        raise HTTPException(status_code=400, detail=f"文件 '{file_name}' 已存在，ID: {existing.id}")
+        # 删除旧记录，允许重新上传
+        db.delete(existing)
+        db.commit()
+        print(f"[上传] 已删除旧记录: {file_name}, ID: {existing.id}")
     
     try:
         # 读取文件内容
+        print("[上传] 读取文件内容...")
         pdf_bytes = await file.read()
+        print(f"[上传] 文件大小: {len(pdf_bytes)} 字节")
         
         # 1. PDF 转图片
+        print("[上传] PDF 转图片...")
         images = pdf_bytes_to_images(pdf_bytes)
         page_count = len(images)
+        print(f"[上传] 转换完成，共 {page_count} 页")
         
         # 2. OCR 识别
+        print("[上传] OCR 识别中...")
         ocr_results = ocr_images(images)
         ocr_results = filter_watermarks(ocr_results)
+        print(f"[上传] OCR 完成，共 {len(ocr_results)} 页结果")
         
         # 合并全文
         full_text = ""
@@ -164,17 +175,22 @@ async def upload_and_extract_contract(
             full_text += f"\n--- 第{page['page']}页 ---\n"
             for item in page["content"]:
                 full_text += item["text"] + "\n"
+        print(f"[上传] OCR 文本长度: {len(full_text)} 字符")
         
         # 3. 提取合同信息
+        print(f"[上传] AI 提取信息中... (use_vision={use_vision})")
         extracted_info = extract_contract_info(
             images=images,
             ocr_text=full_text,
             use_vision=use_vision,
         )
+        print(f"[上传] 提取结果: {extracted_info}")
         
         # 4. 保存到数据库
         performance_id = None
         if save_to_db:
+            print("[上传] 保存到数据库...")
+            
             # 转换日期格式
             sign_date = None
             if extracted_info.get("sign_date"):
@@ -183,17 +199,9 @@ async def upload_and_extract_contract(
                 except ValueError:
                     pass
             
-            # 金额转换（元 -> 万元）
+            # 金额（AI 已按万元提取，直接使用）
             amount = extracted_info.get("amount")
-            if amount:
-                amount = amount / 10000  # 转为万元
-            
             subject_amount = extracted_info.get("subject_amount")
-            if subject_amount:
-                subject_amount = subject_amount / 10000
-            
-            # 图片打包为 BLOB
-            image_blob = images_to_blob(images)
             
             # 创建业绩记录
             performance_data = PerformanceCreate(
@@ -213,6 +221,7 @@ async def upload_and_extract_contract(
             
             performance = crud.create_performance(db, performance_data)
             performance_id = performance.id
+            print(f"[上传] 保存成功，ID: {performance_id}")
         
         return UploadResponse(
             success=True,
@@ -227,6 +236,8 @@ async def upload_and_extract_contract(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"合同解析失败: {str(e)}")
 
 # endregion
@@ -240,7 +251,7 @@ async def upload_and_extract_contract(
 @router.post("/contracts/batch")
 async def batch_upload_contracts(
     files: list[UploadFile] = File(..., description="多个合同 PDF 文件"),
-    use_vision: bool = Form(True, description="是否使用视觉模型"),
+    use_vision: bool = Form(False, description="是否使用视觉模型"),
     db: Session = Depends(get_db),
 ):
     """
@@ -298,10 +309,12 @@ async def batch_upload_contracts(
                     sign_date = datetime.strptime(extracted_info["sign_date"], "%Y-%m-%d").date()
                 except ValueError:
                     pass
-            
+            '''
             amount = extracted_info.get("amount")
             if amount:
                 amount = amount / 10000
+            '''
+            amount = extracted_info.get("amount")
             
             performance_data = PerformanceCreate(
                 file_name=file.filename,
