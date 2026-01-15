@@ -125,3 +125,36 @@ def build_system_prompt(task: str, steps: List[AgentStep] = None) -> str:
 
 # endregion
 # ============================================
+
+# ============================================
+# region 简化版系统提示词
+# ============================================
+
+def load_system_prompt(tool_registry) -> str:
+    """
+    加载系统提示词（简化版，供新 Agent 使用）
+    
+    参数:
+        tool_registry: 工具注册表
+    返回:
+        系统提示词
+    """
+    tools_prompt = tool_registry.get_tools_prompt()
+    
+    return f"""你是招投标助手 Agent。
+
+## 可用工具
+{tools_prompt}
+
+## 响应格式
+思考时使用 
+
+<div class="think">...</div>
+
+ 标签
+调用工具时使用 <action>{{"tool": "工具名", "params": {{}}}}</action> 标签
+直接回答时不要使用任何标签
+"""
+
+# endregion
+# ============================================

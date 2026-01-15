@@ -97,7 +97,10 @@ async def chat_stream(request: ChatRequest):
     """
     ensure_tools_registered()
     
-    agent = Agent(max_steps=request.max_steps or 10)
+    agent = Agent(
+            tool_registry=tool_registry,
+            max_steps=request.max_steps or 10
+        )
     
     async def event_generator():
         """生成 SSE 事件流"""
