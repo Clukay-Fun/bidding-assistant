@@ -68,25 +68,14 @@ async def chat(request: ChatRequest):
     """
     ensure_tools_registered()
     
-    agent = Agent(max_steps=request.max_steps or 10)
+    agent = Agent(tool_registry=tool_registry, max_steps=request.max_steps or 10)
     result = agent.run(request.message)
     
-    # 提取工具调用记录
-    tool_calls = [
-        {
-            "tool": step.tool_name,
-            "params": step.tool_params,
-            "success": step.error is None,
-        }
-        for step in result.steps
-        if step.tool_name
-    ]
-    
     return ChatResponse(
-        answer=result.final_answer or "抱歉，我无法完成这个任务。",
-        steps=result.current_step,
-        tool_calls=tool_calls,
-    )
+    answer=result or "抱歉，我无法完成这个任务。",
+    steps=1,  # 简化返回
+    tool_calls=[],  # 简化返回
+)
 
 
 @router.post("/stream")
@@ -105,12 +94,11 @@ async def chat_stream(request: ChatRequest):
     async def event_generator():
         """生成 SSE 事件流"""
         for event in agent.run_stream(request.message):
-            event_type = event.get("event", "message")
-            event_data = event.get("data", {})
-            
-            # SSE 格式: event: xxx\ndata: xxx\n\n
+            event_type = event.get("type", "message")
+            # 整个 event 就是数据
             yield f"event: {event_type}\n"
-            yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
     
     return StreamingResponse(
         event_generator(),

@@ -9,7 +9,7 @@ import io
 from typing import List, Optional
 from PIL import Image
 from openai import OpenAI
-# 视觉模型从配置导入
+# 从配置导入
 from app.config import (
     SILICONFLOW_API_KEY,
     SILICONFLOW_BASE_URL,
@@ -21,9 +21,6 @@ from app.config import (
 # ============================================
 # region 配置
 # ============================================
-
-# 视觉模型（用于图片识别）
-VISION_MODEL = "THUDM/GLM-4.1V-9B-Thinking"
 
 # 提取提示词
 EXTRACT_PROMPT = """

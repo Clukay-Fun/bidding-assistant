@@ -97,13 +97,14 @@ class ToolRegistry:
         """列出所有工具名称"""
         return list(self._tools.keys())
     
-    def call(self, name: str, **kwargs) -> ToolResult:
+    def call(self, name: str, params: dict = None, **kwargs) -> ToolResult:
         """
         调用工具
         
         参数:
             name: 工具名称
-            **kwargs: 工具参数
+            params: 工具参数（字典形式）
+            **kwargs: 工具参数（关键字形式）
         返回:
             ToolResult 标准化结果
         """
@@ -115,11 +116,18 @@ class ToolRegistry:
                 error=f"工具 '{name}' 不存在"
             )
         
+        # 合并参数：params 字典 + kwargs
+        final_params = {}
+        if params:
+            final_params.update(params)
+        final_params.update(kwargs)
+        
         try:
-            result = tool(**kwargs)
+            result = tool(**final_params)
             return ToolResult.ok(tool_name=name, result=result)
         except Exception as e:
             return ToolResult.fail(tool_name=name, error=str(e))
+
     
     def get_tools_prompt(self, category: Optional[str] = None) -> str:
         """

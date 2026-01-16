@@ -57,6 +57,18 @@ async def search_lawyers(
     )
     return lawyers
 
+@router.get("/by-name/{name}", response_model=LawyerResponse)
+async def get_lawyer_by_name(
+    name: str,
+    db: Session = Depends(get_db),
+):
+    """
+    根据姓名获取律师（精确匹配）
+    """
+    lawyer = crud.get_lawyer_by_name(db, name)
+    if not lawyer:
+        raise HTTPException(status_code=404, detail="律师不存在")
+    return lawyer
 
 @router.get("/{lawyer_id}", response_model=LawyerResponse)
 async def get_lawyer(
@@ -67,20 +79,6 @@ async def get_lawyer(
     获取单个律师详情
     """
     lawyer = crud.get_lawyer_by_id(db, lawyer_id)
-    if not lawyer:
-        raise HTTPException(status_code=404, detail="律师不存在")
-    return lawyer
-
-
-@router.get("/by-name/{name}", response_model=LawyerResponse)
-async def get_lawyer_by_name(
-    name: str,
-    db: Session = Depends(get_db),
-):
-    """
-    根据姓名获取律师（精确匹配）
-    """
-    lawyer = crud.get_lawyer_by_name(db, name)
     if not lawyer:
         raise HTTPException(status_code=404, detail="律师不存在")
     return lawyer

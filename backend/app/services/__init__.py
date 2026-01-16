@@ -27,6 +27,12 @@ from app.services.vector_search import (
     batch_update_embeddings,
 )
 
+from app.services.document import (
+    pdf_to_markdown,
+    word_to_markdown,
+    document_to_markdown,
+)
+
 __all__ = [
     # OCR
     "pdf_to_images",
@@ -47,4 +53,8 @@ __all__ = [
     "search_lawyers_by_resume",
     "update_performance_embedding",
     "batch_update_embeddings",
+    # 文档解析
+    "pdf_to_markdown",
+    "word_to_markdown",
+    "document_to_markdown",
 ]

@@ -25,11 +25,14 @@ SILICONFLOW_BASE_URL = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflo
 # ============================================
 # 模型配置
 # ============================================
-# 对话模型
-CHAT_MODEL = os.getenv("CHAT_MODEL", "Qwen/Qwen2.5-72B-Instruct")
+# 核心推理：用于 Agent 的规划和复杂条款判定
+REASONING_MODEL = os.getenv("REASONING_MODEL", "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B")
 
-# 提取模型（用于合同信息提取）
-EXTRACT_MODEL = os.getenv("EXTRACT_MODEL", "Qwen/Qwen2.5-72B-Instruct")
+# 任务执行：用于具体的 JSON 提取和标书解析
+EXTRACT_MODEL = os.getenv("EXTRACT_MODEL", "Qwen/Qwen3-8B")
+
+# 对话输出：用于最终的交互式回复
+CHAT_MODEL = os.getenv("CHAT_MODEL", "internlm/internlm2_5-7b-chat")
 
 # 嵌入模型
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
@@ -39,7 +42,7 @@ EMBEDDING_DIM = 1024
 RERANK_MODEL = os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
 
 # 视觉识别模型
-VISION_MODEL = os.getenv("VISION_MODEL", "Pro/Qwen2.5-VL-7B-Instruct")
+VISION_MODEL = os.getenv("VISION_MODEL", "THUDM/GLM-4.1V-9B-Thinking")
 
 # ============================================
 # 数据库配置

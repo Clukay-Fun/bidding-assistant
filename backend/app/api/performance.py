@@ -25,6 +25,46 @@ router = APIRouter(prefix="/performances", tags=["业绩管理"])
 # endregion
 # ============================================
 
+# ============================================
+# region 统计接口
+# ============================================
+
+@router.get("/stats/summary")
+async def get_performance_stats(db: Session = Depends(get_db)):
+    """
+    获取业绩统计信息
+    """
+    from sqlalchemy import func
+    from app.db.models import Performance
+    
+    # 总数
+    total_count = db.query(func.count(Performance.id)).scalar()
+    
+    # 总金额
+    total_amount = db.query(func.sum(Performance.amount)).scalar() or 0
+    
+    # 按合同类型统计
+    type_stats = db.query(
+        Performance.contract_type,
+        func.count(Performance.id).label("count"),
+        func.sum(Performance.amount).label("amount"),
+    ).group_by(Performance.contract_type).all()
+    
+    return {
+        "total_count": total_count,
+        "total_amount": float(total_amount),
+        "by_type": [
+            {
+                "type": item[0] or "未分类",
+                "count": item[1],
+                "amount": float(item[2] or 0),
+            }
+            for item in type_stats
+        ],
+    }
+
+# endregion
+# ============================================
 
 # ============================================
 # region 查询接口
@@ -147,48 +187,6 @@ async def delete_performance(
     if not success:
         raise HTTPException(status_code=404, detail="业绩不存在")
     return {"message": "删除成功", "id": performance_id}
-
-# endregion
-# ============================================
-
-
-# ============================================
-# region 统计接口
-# ============================================
-
-@router.get("/stats/summary")
-async def get_performance_stats(db: Session = Depends(get_db)):
-    """
-    获取业绩统计信息
-    """
-    from sqlalchemy import func
-    from app.db.models import Performance
-    
-    # 总数
-    total_count = db.query(func.count(Performance.id)).scalar()
-    
-    # 总金额
-    total_amount = db.query(func.sum(Performance.amount)).scalar() or 0
-    
-    # 按合同类型统计
-    type_stats = db.query(
-        Performance.contract_type,
-        func.count(Performance.id).label("count"),
-        func.sum(Performance.amount).label("amount"),
-    ).group_by(Performance.contract_type).all()
-    
-    return {
-        "total_count": total_count,
-        "total_amount": float(total_amount),
-        "by_type": [
-            {
-                "type": item[0] or "未分类",
-                "count": item[1],
-                "amount": float(item[2] or 0),
-            }
-            for item in type_stats
-        ],
-    }
 
 # endregion
 # ============================================
