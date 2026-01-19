@@ -10,20 +10,25 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ============================================
-# 项目路径
+# region 项目路径
 # ============================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 BACKEND_DIR = Path(__file__).parent.parent
 PROMPTS_DIR = BASE_DIR / "prompts"
+# endregion
+# ============================================
+
 
 # ============================================
-# 硅基流动 API 配置
+# region 硅基流动 API 配置
 # ============================================
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 SILICONFLOW_BASE_URL = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+# endregion
+# ============================================
 
 # ============================================
-# 模型配置
+# region 模型配置
 # ============================================
 # 核心推理：用于 Agent 的规划和复杂条款判定
 REASONING_MODEL = os.getenv("REASONING_MODEL", "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B")
@@ -43,9 +48,11 @@ RERANK_MODEL = os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
 
 # 视觉识别模型
 VISION_MODEL = os.getenv("VISION_MODEL", "THUDM/GLM-4.1V-9B-Thinking")
+# endregion
+# ============================================
 
 # ============================================
-# 数据库配置
+# region 数据库配置
 # ============================================
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
@@ -57,8 +64,12 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 )
+# endregion
+# ============================================
 
 # ============================================
-# OCR 配置
+# region OCR 配置
 # ============================================
 OCR_LANG = os.getenv("OCR_LANG", "ch")
+# endregion
+# ============================================
